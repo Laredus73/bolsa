@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Panel de Bolsa · Ferran</title>
+<style>
+  :root{--bg:#0d0f14;--panel:#161a22;--panel2:#1d222c;--line:#2a3040;
+    --tx:#e8ebf2;--tx2:#8b94a7;--verde:#2ee06a;--verdebg:#0f2f1c;
+    --rojo:#ff5b5b;--rojobg:#331414;--azul:#4c8dff;--amar:#f5c451}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:14px}
+  header{padding:20px 24px 12px;border-bottom:1px solid var(--line);
+    position:sticky;top:0;background:var(--bg);z-index:10;
+    display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px}
+  h1{margin:0;font-size:19px}
+  .sub{color:var(--tx2);font-size:12px;margin-top:3px}
+  #estado{font-size:12px;color:var(--tx2)}
+  #estado.ok{color:var(--verde)} #estado.load{color:var(--amar)} #estado.err{color:var(--rojo)}
+  .controls{display:flex;gap:9px;flex-wrap:wrap;align-items:center;
+    padding:14px 24px;border-bottom:1px solid var(--line);
+    position:sticky;top:62px;background:var(--bg);z-index:9}
+  input[type=search]{flex:1;min-width:160px;background:var(--panel2);
+    border:1px solid var(--line);color:var(--tx);padding:8px 12px;border-radius:8px;outline:none}
+  input[type=search]:focus{border-color:var(--azul)}
+  .seg{display:flex;background:var(--panel2);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .seg button{background:none;border:none;color:var(--tx2);padding:8px 13px;cursor:pointer;font-size:13px;font-weight:600}
+  .seg button.on{background:var(--azul);color:#fff}
+  label.pot{display:flex;align-items:center;gap:7px;color:var(--tx2);font-size:13px;
+    background:var(--panel2);border:1px solid var(--line);padding:6px 12px;border-radius:8px}
+  label.pot input{width:56px;background:var(--bg);border:1px solid var(--line);
+    color:var(--tx);border-radius:6px;padding:4px 6px;text-align:center}
+  .btn{background:var(--panel2);border:1px solid var(--line);color:var(--tx);
+    padding:8px 13px;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px}
+  .btn:hover{border-color:var(--azul)}
+  .wrap{padding:6px 24px 60px}
+  h2{margin:24px 0 3px;font-size:15px;display:flex;align-items:center;gap:8px}
+  .dot{width:9px;height:9px;border-radius:50%}
+  .dotA{background:var(--verde)} .dotB{background:var(--amar)}
+  .h2sub{color:var(--tx2);font-size:12px;margin:0 0 10px}
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;color:var(--tx2);font-size:11px;text-transform:uppercase;
+    letter-spacing:.5px;padding:8px 9px;border-bottom:1px solid var(--line);cursor:pointer;white-space:nowrap}
+  th:hover{color:var(--tx)}
+  td{padding:11px 9px;border-bottom:1px solid var(--panel2)}
+  tr:hover td{background:var(--panel)}
+  .tk{font-family:ui-monospace,Menlo,monospace;font-weight:700;
+    background:var(--panel2);padding:2px 7px;border-radius:5px;font-size:12.5px}
+  .name{font-weight:600}.desc{color:var(--tx2);font-size:12px}
+  .pos{color:var(--verde);font-weight:700}.neg{color:var(--rojo);font-weight:700}
+  .nota{font-weight:700}.bar{height:5px;border-radius:3px;background:var(--panel2);margin-top:4px;width:64px;overflow:hidden}
+  .bar>i{display:block;height:100%;background:linear-gradient(90deg,#4c8dff,#2ee06a)}
+  .badge{font-size:11px;padding:2px 7px;border-radius:20px;font-weight:600}
+  .bd-buy{background:var(--verdebg);color:var(--verde)}.bd-hold{background:#332a12;color:var(--amar)}
+  .rsi{color:var(--rojo);font-weight:700}
+  .live{color:var(--verde)} .stale{color:var(--tx2)}
+  .hide{display:none}
+  .aviso{margin:12px 24px 0;padding:9px 13px;border-radius:8px;background:var(--rojobg);
+    border:1px solid #5a2020;color:#ffbcbc;font-size:12.5px}
+  footer{color:var(--tx2);font-size:11.5px;padding:0 24px 40px;line-height:1.6}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>Panel de Bolsa</h1><div class="sub">USA · Europa · Japón — precio objetivo de analistas</div></div>
+  <div id="estado" class="load">Cargando cotizaciones en vivo…</div>
+</header>
+
+<div class="aviso">
+  <b>Mercado hoy:</b> los chips/memoria (Sandisk, Micron, Lumentum…) vienen de una corrección fuerte esta semana.
+  Potenciales muy altos = caída reciente que los analistas aún no han recortado. No hay prisa por entrar.
+</div>
+
+<div class="controls">
+  <input type="search" id="buscar" placeholder="Buscar empresa o código…">
+  <div class="seg" id="segLista">
+    <button data-l="todo" class="on">Ambas</button>
+    <button data-l="A">A · Mantener</button>
+    <button data-l="B">B · Rebote</button>
+  </div>
+  <div class="seg" id="segZona">
+    <button data-z="todo" class="on">Todas</button>
+    <button data-z="USA">USA</button>
+    <button data-z="Europa">Europa</button>
+  </div>
+  <label class="pot">Potencial mín. <input type="number" id="potMin" value="30" min="0" step="5">%</label>
+  <button class="btn" id="refrescar">↻ Actualizar precios</button>
+</div>
+
+<div class="wrap">
+  <section id="secA">
+    <h2><span class="dot dotA"></span>Lista A · Comprar y mantener (meses)</h2>
+    <p class="h2sub">Impulso sólido + recorrido según analistas. Horizonte: meses.</p>
+    <table><thead><tr id="thA"></tr></thead><tbody id="tbA"></tbody></table>
+  </section>
+  <section id="secB">
+    <h2><span class="dot dotB"></span>Lista B · Días — <span style="color:var(--rojo)">alto riesgo</span></h2>
+    <p class="h2sub">Muy castigadas que los analistas aún respaldan. Fija la venta ANTES de comprar.</p>
+    <table><thead><tr id="thB"></tr></thead><tbody id="tbB"></tbody></table>
+  </section>
+</div>
+
+<footer>
+  <span id="pie"></span> · La "Nota" es un ranking relativo por impulso, recorrido y consenso — no es predicción ni asesoramiento financiero.
+  Precios en vivo vía Stooq; si una fuente falla, se usa el último valor conocido (marcado en gris).
+  Códigos europeos: en Revolut busca por nombre. Japón hoy no coloca ningún valor.
+</footer>
+
+<script>
+// Cada valor: precio base (fallback) + objetivo fijo de analistas. El precio se intenta refrescar en vivo.
+const A=[
+ {n:1,nombre:"Sandisk",tk:"SNDK",stooq:"sndk.us",zona:"USA",sector:"Almacenamiento",desc:"Memoria flash y SSD",precio:1096,obj:2188,na:23,rating:"Buy",sc:90,mon:"$"},
+ {n:2,nombre:"Micron Technology",tk:"MU",stooq:"mu.us",zona:"USA",sector:"Semiconductores",desc:"Memoria DRAM/NAND para IA",precio:803,obj:1507,na:45,rating:"Strong Buy",sc:94,mon:"$"},
+ {n:3,nombre:"STMicroelectronics",tk:"STM",stooq:"stm.us",zona:"Europa",sector:"Semiconductores",desc:"Chips auto/industria (ADR USA)",precio:49,obj:70,na:20,rating:"Buy",sc:77,mon:"$"},
+ {n:4,nombre:"Ciena",tk:"CIEN",stooq:"cien.us",zona:"USA",sector:"Óptica",desc:"Redes ópticas de alta velocidad",precio:90,obj:120,na:15,rating:"Buy",sc:80,mon:"$"},
+ {n:5,nombre:"Siemens Energy",tk:"ENR",stooq:"enr.de",zona:"Europa",sector:"Electricas",desc:"Turbinas y redes eléctricas",precio:95,obj:125,na:25,rating:"Buy",sc:75,mon:"€"},
+ {n:6,nombre:"Lumentum",tk:"LITE",stooq:"lite.us",zona:"USA",sector:"Óptica",desc:"Componentes ópticos para IA",precio:773,obj:1020,na:25,rating:"Buy",sc:86,mon:"$"},
+ {n:7,nombre:"Infineon",tk:"IFX",stooq:"ifx.de",zona:"Europa",sector:"Semiconductores",desc:"Semiconductores de potencia",precio:66,obj:87,na:24,rating:"Buy",sc:76,mon:"€"},
+ {n:8,nombre:"Vertiv Holdings",tk:"VRT",stooq:"vrt.us",zona:"USA",sector:"Infraestructura",desc:"Refrigeración de data centers",precio:297,obj:343,na:25,rating:"Buy",sc:84,mon:"$"},
+ {n:9,nombre:"MasTec",tk:"MTZ",stooq:"mtz.us",zona:"USA",sector:"Industria",desc:"Infraestructura eléctrica",precio:348,obj:420,na:15,rating:"Buy",sc:82,mon:"$"},
+ {n:10,nombre:"Coherent",tk:"COHR",stooq:"cohr.us",zona:"USA",sector:"Óptica",desc:"Láseres y óptica",precio:317,obj:390,na:22,rating:"Buy",sc:78,mon:"$"}
+];
+const B=[
+ {n:1,nombre:"Tesla",tk:"TSLA",stooq:"tsla.us",zona:"USA",sector:"Consumo cíclico",desc:"Coches eléctricos y energía",precio:310,obj:425,na:40,rsi:15,sc:86,mon:"$"},
+ {n:2,nombre:"Oracle",tk:"ORCL",stooq:"orcl.us",zona:"USA",sector:"Software",desc:"Software empresarial y nube",precio:118,obj:145,na:41,rsi:28,sc:77,mon:"$"},
+ {n:3,nombre:"Celsius Holdings",tk:"CELH",stooq:"celh.us",zona:"USA",sector:"Consumo básico",desc:"Bebidas energéticas",precio:27,obj:33,na:18,rsi:15,sc:88,mon:"$"},
+ {n:4,nombre:"Synopsys",tk:"SNPS",stooq:"snps.us",zona:"USA",sector:"Software",desc:"Software de diseño de chips",precio:373,obj:430,na:24,rsi:19,sc:82,mon:"$"},
+ {n:5,nombre:"Intuitive Surgical",tk:"ISRG",stooq:"isrg.us",zona:"USA",sector:"Salud",desc:"Robots quirúrgicos",precio:339,obj:390,na:20,rsi:22,sc:76,mon:"$"},
+ {n:6,nombre:"Capri Holdings",tk:"CPRI",stooq:"cpri.us",zona:"USA",sector:"Consumo cíclico",desc:"Lujo (Michael Kors, Versace)",precio:16,obj:19,na:16,rsi:25,sc:72,mon:"$"},
+ {n:7,nombre:"Albertsons",tk:"ACI",stooq:"aci.us",zona:"USA",sector:"Consumo básico",desc:"Supermercados",precio:11,obj:13,na:14,rsi:23,sc:74,mon:"$"},
+ {n:8,nombre:"Sprouts Farmers",tk:"SFM",stooq:"sfm.us",zona:"USA",sector:"Consumo básico",desc:"Supermercados saludables",precio:74,obj:88,na:14,rsi:17,sc:70,mon:"$"},
+ {n:9,nombre:"Vonovia",tk:"VNA",stooq:"vna.de",zona:"Europa",sector:"Inmobiliario",desc:"Vivienda en alquiler",precio:21,obj:24,na:22,rsi:22,sc:78,mon:"€"}
+];
+const TODOS=[...A,...B];
+TODOS.forEach(r=>{r.live=false; r.pot=Math.round((r.obj/r.precio-1)*100);});
+
+// ---- precios en vivo desde Stooq (CSV, CORS abierto) ----
+async function unPrecio(r){
+  try{
+    const u=`https://stooq.com/q/l/?s=${r.stooq}&f=sd2t2ohlcv&h&e=csv`;
+    const res=await fetch(u); const txt=await res.text();
+    const linea=txt.trim().split("\n")[1]||"";
+    const cols=linea.split(",");
+    const close=parseFloat(cols[6]);
+    if(close&&close>0){ r.precio=close; r.live=true; r.pot=Math.round((r.obj/close-1)*100); return true; }
+  }catch(e){}
+  return false;
+}
+async function refrescar(){
+  const est=document.getElementById('estado');
+  est.className='load'; est.textContent='Actualizando precios en vivo…';
+  let ok=0;
+  await Promise.all(TODOS.map(async r=>{ if(await unPrecio(r)) ok++; }));
+  if(ok>0){ est.className='ok'; est.textContent=`● ${ok} precios en vivo · ${new Date().toLocaleTimeString('es')}`; }
+  else{ est.className='err'; est.textContent='Sin conexión a precios · mostrando últimos valores'; }
+  pinta();
+}
+
+const flag=z=>z==="USA"?"🇺🇸":(z==="Europa"?"🇪🇺":z);
+let sA={k:"pot",d:-1}, sB={k:"pot",d:-1}, fL="todo", fZ="todo";
+const colsA=[["n","#"],["nombre","Empresa"],["tk","Código"],["zona","Zona"],["precio","Precio"],["obj","Objetivo"],["pot","Potencial"],["na","Analistas"],["rating","Consenso"],["sc","Nota"]];
+const colsB=[["n","#"],["nombre","Empresa"],["tk","Código"],["zona","Zona"],["precio","Precio"],["obj","Objetivo"],["pot","Potencial"],["rsi","RSI"],["na","Analistas"],["sc","Nota"]];
+
+function fmt(v,mon){return (Math.round(v*100)/100).toLocaleString('es')+" "+mon;}
+function celda(r,k){
+  if(k==="nombre")return `<td><div class="name">${r.nombre}</div><div class="desc">${r.desc}</div></td>`;
+  if(k==="tk")return `<td><span class="tk">${r.tk}</span></td>`;
+  if(k==="zona")return `<td>${flag(r.zona)} <span class="desc">${r.zona}</span></td>`;
+  if(k==="precio")return `<td class="${r.live?'live':'stale'}">${fmt(r.precio,r.mon)}${r.live?' ●':''}</td>`;
+  if(k==="obj")return `<td>${fmt(r.obj,r.mon)}</td>`;
+  if(k==="pot")return `<td class="${r.pot>=0?'pos':'neg'}">${r.pot>=0?'+':''}${r.pot}%</td>`;
+  if(k==="na")return `<td>${r.na}</td>`;
+  if(k==="rating"){const c=/Buy/.test(r.rating)?'bd-buy':'bd-hold';return `<td><span class="badge ${c}">${r.rating}</span></td>`;}
+  if(k==="rsi")return `<td class="rsi">${r.rsi}</td>`;
+  if(k==="sc")return `<td><div class="nota">${r.sc}</div><div class="bar"><i style="width:${r.sc}%"></i></div></td>`;
+  return `<td>${r[k]}</td>`;
+}
+function th(cols,s,id){document.getElementById(id).innerHTML=cols.map(([k,t])=>{
+  const a=s.k===k?(s.d<0?' ▼':' ▲'):''; return `<th data-k="${k}">${t}${a}</th>`;}).join('');}
+function ordenar(data,s){return [...data].sort((a,b)=>{let x=a[s.k],y=b[s.k];
+  if(typeof x==="string")return s.d*x.localeCompare(y); return s.d*((x??-1)-(y??-1));});}
+function pinta(){
+  const q=document.getElementById('buscar').value.toLowerCase();
+  const potMin=parseFloat(document.getElementById('potMin').value)||0;
+  const filtra=r=>{
+    if(fZ!=="todo"&&r.zona!==fZ)return false;
+    if(r.pot<potMin)return false;
+    if(q&&!(r.nombre.toLowerCase().includes(q)||r.tk.toLowerCase().includes(q)))return false;
+    return true;};
+  th(colsA,sA,'thA'); th(colsB,sB,'thB');
+  const ra=ordenar(A.filter(filtra),sA), rb=ordenar(B.filter(filtra),sB);
+  document.getElementById('tbA').innerHTML=ra.map(r=>`<tr>${colsA.map(([k])=>celda(r,k)).join('')}</tr>`).join('')||vacio(colsA.length);
+  document.getElementById('tbB').innerHTML=rb.map(r=>`<tr>${colsB.map(([k])=>celda(r,k)).join('')}</tr>`).join('')||vacio(colsB.length);
+  document.getElementById('secA').classList.toggle('hide',fL==="B");
+  document.getElementById('secB').classList.toggle('hide',fL==="A");
+  document.getElementById('pie').textContent=`Objetivos de analistas: consenso a 12 meses (fuentes públicas, jul-2026). Potencial calculado sobre el precio mostrado.`;
+  document.querySelectorAll('#thA th').forEach(t=>t.onclick=()=>{const k=t.dataset.k;sA.d=sA.k===k?-sA.d:-1;sA.k=k;pinta();});
+  document.querySelectorAll('#thB th').forEach(t=>t.onclick=()=>{const k=t.dataset.k;sB.d=sB.k===k?-sB.d:-1;sB.k=k;pinta();});
+}
+function vacio(n){return `<tr><td colspan="${n}" class="desc" style="padding:22px;text-align:center">Sin resultados con estos filtros.</td></tr>`;}
+document.getElementById('buscar').oninput=pinta;
+document.getElementById('potMin').oninput=pinta;
+document.getElementById('refrescar').onclick=refrescar;
+document.querySelectorAll('#segLista button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#segLista button').forEach(x=>x.classList.remove('on'));b.classList.add('on');fL=b.dataset.l;pinta();});
+document.querySelectorAll('#segZona button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#segZona button').forEach(x=>x.classList.remove('on'));b.classList.add('on');fZ=b.dataset.z;pinta();});
+pinta();
+refrescar();
+</script>
+</body>
+</html>
