@@ -105,26 +105,36 @@ def cierre(px):
 
 
 def descargar_precios(T):
-    """Descarga en lotes con reintentos: un fallo puntual no tumba todo."""
+    """Descarga en lotes pequenos con reintentos y normaliza cada lote a
+    columnas = tickers, para que ningun mercado se pierda al concatenar."""
     frames = []
-    lote = 200
+    lote = 100
     for i in range(0, len(T), lote):
         grupo = T[i:i + lote]
+        d = None
         for intento in range(3):
             try:
                 d = yf.download(grupo, period="13mo", auto_adjust=True,
                                 progress=False, threads=True)
-                d = cierre(d)
                 if d is not None and not d.empty:
-                    frames.append(d)
                     break
             except Exception as e:
                 print(f"  lote {i} intento {intento}: {e}")
-                time.sleep(3)
+                time.sleep(4)
+        if d is None or d.empty:
+            print(f"  lote {i}: sin datos, se omite")
+            continue
+        d = cierre(d)
+        # si el lote traia un solo ticker, cierre() puede devolver Serie
+        if isinstance(d, pd.Series):
+            d = d.to_frame(name=grupo[0])
+        frames.append(d)
+        print(f"  lote {i}: {d.shape[1]} valores ok")
     if not frames:
         sys.exit("ERROR: no se pudieron descargar precios (Yahoo no responde).")
     px = pd.concat(frames, axis=1)
     px = px.loc[:, ~px.columns.duplicated()]
+    print(f"  TOTAL descargado: {px.shape[1]} valores")
     return px
 
 
