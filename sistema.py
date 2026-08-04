@@ -142,16 +142,24 @@ def main():
     print("Descargando universo...")
     T, reg = universo()
     print(len(T), "valores")
-    px = descargar_precios(T).dropna(axis=1, thresh=200)
+    px = descargar_precios(T).dropna(axis=1, thresh=150)
+    px = px.ffill()  # rellenar huecos internos para no perder valores
+    n = len(px)
     ult = px.iloc[-1]
-    m12 = (px.iloc[-22] / px.iloc[0] - 1) * 100
-    m6 = (ult / px.iloc[-126] - 1) * 100
+    # posiciones seguras segun el historial disponible
+    i12 = max(0, n - 252)
+    i6 = max(0, n - 126)
+    i1 = max(0, n - 22)
+    m12 = (px.iloc[i1] / px.iloc[i12] - 1) * 100
+    m6 = (ult / px.iloc[i6] - 1) * 100
     dd = px.diff()
     gg = dd.clip(lower=0).rolling(14).mean().iloc[-1]
     ll = (-dd.clip(upper=0)).rolling(14).mean().iloc[-1]
     rsi = 100 - 100 / (1 + gg / ll)
     B = pd.DataFrame({"m12": m12, "m6": m6, "rsi": rsi,
-                      "dmin": (ult / px.min() - 1) * 100}).dropna()
+                      "dmin": (ult / px.min() - 1) * 100})
+    B = B.dropna(subset=["m12", "m6"])  # solo exigir momentum, no rsi/dmin
+    print(f"Empresas con indicadores validos: {len(B)}")
     comp = B.m12.rank(pct=True) * .7 + B.m6.rank(pct=True) * .3
     fA = comp.nlargest(90).index.tolist()
     fB = B[(B.rsi < 35) & (B.dmin < 15)].sort_values("rsi").index.tolist()[:45]
