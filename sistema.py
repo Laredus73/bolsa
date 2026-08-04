@@ -159,6 +159,7 @@ def main():
     import random
     candidatos = sorted(set(fA + fB))
     random.shuffle(candidatos)
+    con_objetivo = 0
     for t in candidatos:
         inf = {}
         for _ in range(4):
@@ -170,6 +171,17 @@ def main():
                 pass
             time.sleep(1.5)
         o = inf.get("targetMeanPrice")
+        na = inf.get("numberOfAnalystOpinions") or 0
+        # plan B: si .info no trajo objetivo, probar analyst_price_targets
+        if not o:
+            try:
+                apt = yf.Ticker(t).analyst_price_targets
+                if apt and apt.get("mean"):
+                    o = apt.get("mean")
+            except Exception:
+                pass
+        if o:
+            con_objetivo += 1
         pr = float(ult[t])
         sc = inf.get("sector", "")
         eps_f, eps_t = inf.get("forwardEps"), inf.get("trailingEps")
@@ -180,9 +192,10 @@ def main():
                       sector=SEC.get(sc, sc or "Otros"),
                       mon=inf.get("currency", "?"), precio=round(pr, 2),
                       obj=o, rec=(o / pr - 1) * 100 if o else np.nan,
-                      na=inf.get("numberOfAnalystOpinions") or 0,
+                      na=na,
                       rm=inf.get("recommendationMean") or 9, revision=rev))
         time.sleep(0.5)
+    print(f"Candidatos: {len(candidatos)} | con objetivo de analistas: {con_objetivo}")
     if R:
         D = pd.DataFrame(R).set_index("tk").join(B)
     else:
@@ -219,9 +232,9 @@ def fila_html(i, r, modo):
         cons = "<span class='badge buy'>Buy</span>"
     else:
         cons = "<span class='badge hold'>Hold</span>"
-    # aviso Revolut: Japon y Suiza no comprables
+    # aviso Revolut: solo Japon (Tokio) no es comprable; Suiza/CHF si
     reg = str(r["reg"])
-    no_rev = reg == "Japon" or mon == "CHF"
+    no_rev = reg == "Japon"
     aviso = " <span class=norev>fuera de Revolut</span>" if no_rev else ""
     extra = (f"{r['m6']:.0f}% 6m" if modo == "A" else f"RSI {r['rsi']:.0f}")
     return f"""<tr><td class=n>{i}</td><td><b>{r['nombre']}</b>{aviso}<br>
