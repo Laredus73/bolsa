@@ -180,7 +180,12 @@ def main():
                       na=inf.get("numberOfAnalystOpinions") or 0,
                       rm=inf.get("recommendationMean") or 9, revision=rev))
         time.sleep(0.5)
-    D = pd.DataFrame(R).set_index("tk").join(B)
+    if R:
+        D = pd.DataFrame(R).set_index("tk").join(B)
+    else:
+        print("Aviso: ningun candidato devolvio datos de analistas.")
+        D = pd.DataFrame(columns=["reg", "nombre", "sector", "mon", "precio",
+                                  "obj", "rec", "na", "rm", "revision"]).join(B)
 
     A = D[(D.index.isin(fA)) & (D.na >= MIN_ANALISTAS) & (D.rec.fillna(-1) > 0)].copy()
     A["SC"] = (A.m12.rank(pct=True) * 40 + A.rec.rank(pct=True) * 35
