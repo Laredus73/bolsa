@@ -3,7 +3,7 @@ name: Listas de bolsa semanales
 
 on:
   schedule:
-   - cron: '0 7 * * 1,4'
+   - cron: '0 7 * * 1-5'
 
   workflow_dispatch:
 
