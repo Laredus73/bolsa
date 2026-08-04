@@ -156,16 +156,19 @@ def main():
     fA = comp.nlargest(90).index.tolist()
     fB = B[(B.rsi < 35) & (B.dmin < 15)].sort_values("rsi").index.tolist()[:45]
     R = []
-    for t in sorted(set(fA + fB)):
+    import random
+    candidatos = sorted(set(fA + fB))
+    random.shuffle(candidatos)
+    for t in candidatos:
         inf = {}
-        for _ in range(3):
+        for _ in range(4):
             try:
                 inf = yf.Ticker(t).info or {}
                 if inf.get("numberOfAnalystOpinions") is not None or inf.get("longName"):
                     break
             except Exception:
                 pass
-            time.sleep(1.2)
+            time.sleep(1.5)
         o = inf.get("targetMeanPrice")
         pr = float(ult[t])
         sc = inf.get("sector", "")
@@ -187,13 +190,13 @@ def main():
         D = pd.DataFrame(columns=["reg", "nombre", "sector", "mon", "precio",
                                   "obj", "rec", "na", "rm", "revision"]).join(B)
 
-    A = D[(D.index.isin(fA)) & (D.na >= MIN_ANALISTAS) & (D.rec.fillna(-1) > 0)].copy()
+    A = D[(D.index.isin(fA)) & (D.na >= MIN_ANALISTAS) & (D.rec.fillna(-1) >= 30)].copy()
     A["SC"] = (A.m12.rank(pct=True) * 40 + A.rec.rank(pct=True) * 35
                + (6 - A.rm).rank(pct=True) * 25).round(1)
     A = A.sort_values("SC", ascending=False).groupby("sector",
-                                                      group_keys=False).head(4).head(10)
+                                                      group_keys=False).head(4).head(12)
     Bb = D[(D.index.isin(fB)) & (D.na >= MIN_ANALISTAS)
-           & (D.rm <= 2.5) & (D.rec.fillna(0) > 20)].copy()
+           & (D.rm <= 2.5) & (D.rec.fillna(0) >= 30)].copy()
     if len(Bb):
         Bb["SC"] = ((100 - Bb.rsi).rank(pct=True) * 50
                     + Bb.rec.rank(pct=True) * 50).round(1)
@@ -206,14 +209,25 @@ def main():
 def fila_html(i, r, modo):
     mon = str(r["mon"])
     pen = " (peniques /100)" if mon == "GBp" else ""
-    obj = (f"{r['obj']:.2f} (+{r['rec']:.0f}%)"
-           if r["obj"] == r["obj"] else "s/d")
-    extra = (f"6 meses: {r['m6']:.0f}%"
-             if modo == "A" else f"RSI {r['rsi']:.0f} (sobreventa)")
-    return f"""<tr><td class=n>{i}</td><td><b>{r['nombre']}</b><br>
+    obj = (f"{r['obj']:.2f} {mon}" if r["obj"] == r["obj"] else "s/d")
+    pot = (f"<b class=pot>+{r['rec']:.0f}%</b>" if r["rec"] == r["rec"] else "—")
+    # consenso segun recommendationMean (1=Strong Buy ... 3=Hold)
+    rm = r.get("rm", 9)
+    if rm <= 1.5:
+        cons = "<span class='badge sb'>Strong Buy</span>"
+    elif rm <= 2.5:
+        cons = "<span class='badge buy'>Buy</span>"
+    else:
+        cons = "<span class='badge hold'>Hold</span>"
+    # aviso Revolut: Japon y Suiza no comprables
+    reg = str(r["reg"])
+    no_rev = reg == "Japon" or mon == "CHF"
+    aviso = " <span class=norev>fuera de Revolut</span>" if no_rev else ""
+    extra = (f"{r['m6']:.0f}% 6m" if modo == "A" else f"RSI {r['rsi']:.0f}")
+    return f"""<tr><td class=n>{i}</td><td><b>{r['nombre']}</b>{aviso}<br>
     <span class=tk>{r.name}</span> · {r['reg']} · {r['sector']}</td>
-    <td>{r['precio']} {mon}{pen}</td><td>{obj}</td>
-    <td>{int(r['na'])}</td><td>{extra}</td>
+    <td>{r['precio']} {mon}{pen}</td><td>{obj}</td><td>{pot}</td>
+    <td>{int(r['na'])}</td><td>{cons}</td><td class=ex>{extra}</td>
     <td class=sc>{r['SC']}</td></tr>"""
 
 
@@ -225,41 +239,49 @@ def escribir_html(A, Bb):
         filasB = "\n".join(fila_html(i + 1, r, "B")
                            for i, (_, r) in enumerate(Bb.iterrows()))
     else:
-        filasB = ("<tr><td colspan=7>Hoy ninguna empresa pasa los "
-                  "filtros de calidad. Esta semana no se opera la lista B.</td></tr>")
+        filasB = ("<tr><td colspan=9>Hoy ninguna empresa pasa los "
+                  "filtros (potencial &ge;30% y respaldo de analistas). Esta semana no se opera la lista B.</td></tr>")
     html = f"""<!doctype html><html lang=es><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1">
 <title>Listas de bolsa · {fecha}</title>
 <style>
-body{{font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:900px;
+body{{font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:1000px;
 margin:0 auto;padding:20px;color:#1a1a1a;background:#fafafa}}
 h1{{font-size:22px}}h2{{font-size:18px;margin-top:32px;padding:8px 12px;border-radius:8px}}
 .a h2{{background:#e8f4ea;color:#1a6b2e}}.b h2{{background:#fdeaea;color:#a11}}
 table{{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;
 overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08)}}
-td{{padding:10px 8px;border-bottom:1px solid #eee;font-size:14px;vertical-align:top}}
+td{{padding:10px 8px;border-bottom:1px solid #eee;font-size:13.5px;vertical-align:top}}
 .n{{font-weight:700;color:#999;width:24px}}.tk{{font-family:monospace;
 background:#f0f0f0;padding:1px 5px;border-radius:4px;font-weight:700}}
-.sc{{font-weight:700;font-size:16px}}
-th{{text-align:left;padding:8px;font-size:12px;color:#888;text-transform:uppercase}}
+.sc{{font-weight:700;font-size:16px}}.pot{{color:#1a6b2e;font-size:15px}}
+.ex{{color:#666;font-size:12px}}
+.badge{{font-size:11px;padding:2px 7px;border-radius:20px;font-weight:600;white-space:nowrap}}
+.sb{{background:#d5f0dd;color:#136b2c}}.buy{{background:#dbeafe;color:#1e5bb8}}.hold{{background:#fdf0d5;color:#946b00}}
+.norev{{font-size:11px;background:#fdeaea;color:#a11;padding:1px 6px;border-radius:10px;font-weight:600}}
+th{{text-align:left;padding:8px;font-size:11px;color:#888;text-transform:uppercase}}
 .nota{{font-size:13px;color:#666;background:#fff;padding:12px;border-radius:8px;margin-top:12px}}
 </style>
 <h1>Listas de bolsa — {fecha}</h1>
+<div class=nota style="background:#eef4ff;border-left:4px solid #4c8dff">
+Universo analizado: ~1.400 empresas de USA, Europa y Japón. Filtro aplicado: solo
+potencial <b>&ge;30%</b> según objetivo de analistas. Las marcadas
+<span class=norev>fuera de Revolut</span> (Japón, Suiza) necesitan otro bróker como DEGIRO.</div>
 <div class=a><h2>LISTA A · Comprar y mantener (meses)</h2>
-<table><tr><th>#</th><th>Empresa</th><th>Precio</th><th>Objetivo</th>
-<th>Analistas</th><th>Impulso</th><th>Nota</th></tr>
+<table><tr><th>#</th><th>Empresa</th><th>Precio</th><th>Objetivo</th><th>Potencial</th>
+<th>Analistas</th><th>Consenso</th><th>Impulso</th><th>Nota</th></tr>
 {filasA}</table>
 <div class=nota>Empresas que suben con fuerza y que los analistas ven baratas.
-Maximo 4 por sector. Comprar con orden limitada, sin perseguir el precio.</div></div>
-<div class=b><h2>LISTA B · Operaciones de dias — ALTO RIESGO</h2>
-<table><tr><th>#</th><th>Empresa</th><th>Precio</th><th>Objetivo</th>
-<th>Analistas</th><th>Sobreventa</th><th>Nota</th></tr>
+Máximo 4 por sector. Comprar con orden limitada, sin perseguir el precio.</div></div>
+<div class=b><h2>LISTA B · Operaciones de días — ALTO RIESGO</h2>
+<table><tr><th>#</th><th>Empresa</th><th>Precio</th><th>Objetivo</th><th>Potencial</th>
+<th>Analistas</th><th>Consenso</th><th>Sobreventa</th><th>Nota</th></tr>
 {filasB}</table>
-<div class=nota>Empresas hundidas que los analistas aun respaldan. Decide el
-precio de venta ANTES de comprar. Dinero pequeno.</div></div>
-<div class=nota style=margin-top:24px>Ranking con indicadores objetivos,
-NO es una prediccion ni asesoramiento financiero. Precios del cierre mas
-reciente. Codigos europeos: busca por nombre en tu broker y confirma pais.</div>
+<div class=nota>Empresas hundidas que los analistas aún respaldan. Decide el
+precio de venta ANTES de comprar. Dinero pequeño.</div></div>
+<div class=nota style=margin-top:24px>La <b>Nota</b> es un ranking relativo por impulso,
+recorrido a objetivo y consenso — NO es una predicción ni asesoramiento financiero.
+Precios del cierre más reciente. Códigos europeos: busca por nombre en tu broker y confirma país.</div>
 </html>"""
     with open("informe.html", "w", encoding="utf-8") as f:
         f.write(html)
